@@ -1,0 +1,14 @@
+# No subir node_modules ni la BD local de desarrollo
+node_modules
+web/dist
+prisma/dev.db
+prisma/dev.db-journal
+server.log
+server_err.log
+.env
+.env.*
+!.env.example
+
+# Datos/demos locales y empaquetados que no necesita el serverless
+*.rar
+galileo-portable

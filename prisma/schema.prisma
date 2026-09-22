@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Programa {
+  id                 Int         @id @default(autoincrement())
+  codigo             String      @unique
+  nombre             String
+  descripcion        String?
+  intensidadHoraria  Int         @default(0)
+  duracionMeses      Int         @default(1)
+  precioCentimos     Int
+  cuposTotales       Int         @default(0)
+  activo             Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  matriculas         Matricula[]
+}
+
+model Aspirante {
+  id                       Int         @id @default(autoincrement())
+  tipoDocumento            String
+  numeroDocumento          String
+  nombres                  String
+  apellidos                String
+  fechaNacimiento          DateTime?
+  email                    String?
+  telefono                 String
+  direccion                String?
+  ciudad                   String?
+  acudienteNombre          String?
+  acudienteTelefono        String?
+  autorizaDatos            Boolean     @default(false)
+  modalidad                String?
+  turno                    String?
+  apoderadoTipoDocumento   String?
+  apoderadoNumeroDocumento String?
+  apoderadoDireccion       String?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+  matriculas               Matricula[]
+
+  @@unique([tipoDocumento, numeroDocumento])
+  @@index([apellidos])
+}
+
+model Matricula {
+  id                 Int         @id @default(autoincrement())
+  numeroMatricula    String?     @unique
+  aspiranteId        Int
+  programaId         Int
+  estado             String      @default("pendiente_pago")
+  valorBaseCentimos  Int
+  descuentoCentimos  Int         @default(0)
+  valorTotalCentimos Int
+  observaciones      String?
+  matriculadaAt      DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  aspirante  Aspirante  @relation(fields: [aspiranteId], references: [id], onDelete: Cascade)
+  programa   Programa   @relation(fields: [programaId], references: [id], onDelete: Restrict)
+  codigosPago CodigoPago[]
+  pagos      Pago[]
+
+  @@index([estado])
+  @@index([programaId, estado])
+}
+
+model CodigoPago {
+  id            Int       @id @default(autoincrement())
+  matriculaId   Int
+  codigo        String    @unique
+  valorCentimos Int
+  estado        String    @default("pendiente")
+  expiraAt      DateTime
+  usadoAt       DateTime?
+  anuladoAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  matricula Matricula @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+  pagos     Pago[]
+
+  @@index([matriculaId, estado])
+  @@index([expiraAt])
+}
+
+model Pago {
+  id                    Int       @id @default(autoincrement())
+  matriculaId           Int
+  codigoPagoId          Int?
+  metodo                String
+  valorTotalCentimos    Int
+  valorRecibidoCentimos Int
+  vueltoCentimos        Int       @default(0)
+  referencia            String?
+  pagadoAt              DateTime
+  ip                    String?
+  notas                 String?
+  cierreCajaId          Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  matricula  Matricula  @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+  codigoPago CodigoPago? @relation(fields: [codigoPagoId], references: [id], onDelete: SetNull)
+  cierreCaja CierreCaja? @relation(fields: [cierreCajaId], references: [id], onDelete: Restrict)
+
+  @@index([matriculaId, pagadoAt])
+  @@index([pagadoAt])
+  @@index([cierreCajaId, pagadoAt])
+}
+
+model CierreCaja {
+  id                 Int       @id @default(autoincrement())
+  fecha              DateTime
+  fondoCentimos      Int
+  contadoCentimos    Int
+  esperadoCentimos   Int
+  diferenciaCentimos Int
+  resumen            Json
+  detalle            Json
+  observaciones      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  pagos Pago[]
+
+  @@index([fecha])
+}

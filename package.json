@@ -1,0 +1,41 @@
+{
+    "name": "galileo-node",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "postinstall": "prisma generate",
+        "setup": "npm install && prisma generate && prisma db push && node prisma/seed.js",
+        "db:push": "prisma db push",
+        "db:seed": "node prisma/seed.js",
+        "db:push:turso": "node prisma/push-turso.mjs",
+        "build": "vite build",
+        "start": "node src/server.js",
+        "dev": "concurrently -n api,web -c blue,magenta \"node --watch src/server.js\" \"vite build --watch\""
+    },
+    "dependencies": {
+        "@libsql/client": "^0.18.0",
+        "@prisma/adapter-libsql": "^6.19.3",
+        "@prisma/client": "^6.19.3",
+        "cookie-parser": "^1.4.7",
+        "dotenv": "^18.0.2",
+        "exceljs": "^4.4.0",
+        "express": "^5.2.1",
+        "pdfmake": "^0.3.11",
+        "qrcode": "^1.5.4"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.3.3",
+        "@vitejs/plugin-react": "^6.1.1",
+        "concurrently": "^10.0.5",
+        "prisma": "^6.19.3",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "react-router-dom": "^7.18.4",
+        "tailwindcss": "^4.3.3",
+        "vite": "^8.3.0"
+    }
+}

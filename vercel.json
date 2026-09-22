@@ -1,0 +1,15 @@
+{
+    "version": 2,
+    "buildCommand": "npm run build && node prisma/push-turso.mjs",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/api/index"
+        }
+    ],
+    "functions": {
+        "api/index.mjs": {
+            "includeFiles": "web/**"
+        }
+    }
+}
