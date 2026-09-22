@@ -4,6 +4,7 @@ import AppLayout from '../../Layout.jsx';
 import Paginacion from '../../components/Paginacion.jsx';
 import { GET, POST } from '../../api.js';
 import { soles } from '../../lib/formatos.js';
+import { descargarExcelCierre } from '../../lib/excel.js';
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -214,7 +215,11 @@ export default function Cierres() {
                     <article key={cierre.id} className="card-form mb-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <h3 className="font-bold">Cierre #{cierre.id} · {cierre.created_at}</h3>
-                            <a href={cierre.exportar_url || '#'} className="btn btn-outline">Exportar a Excel (.xlsx)</a>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => descargarExcelCierre(cierre.id)}
+                            >Exportar a Excel (.xlsx)</button>
                         </div>
                         <p className="mt-3">{cierre.cantidad} pagos · Recaudado: {soles(cierre.total / 100)}</p>
                         <p>Fondo: {soles(cierre.fondo / 100)} · Esperado: {soles(cierre.esperado / 100)} · Contado: {soles(cierre.contado / 100)}</p>
