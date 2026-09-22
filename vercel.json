@@ -1,6 +1,7 @@
 {
     "version": 2,
     "buildCommand": "npm run build && node prisma/push-turso.mjs",
+    "outputDirectory": "web/dist",
     "rewrites": [
         {
             "source": "/(.*)",
