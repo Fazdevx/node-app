@@ -237,8 +237,15 @@ export default function Recibo() {
                             </Link>
                         </div>
 
-                        <div className="mt-3 flex justify-center gap-4 text-sm print:hidden">
+                        <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-sm print:hidden">
                             <a href={recibo.pdf_url} className="font-semibold text-naranja-700 underline">Descargar PDF</a>
+                            {recibo.consentimiento ? (
+                                <a href={recibo.consentimiento.pdf_url} download={recibo.consentimiento.nombre_archivo}
+                                   className="font-semibold text-emerald-700 underline">
+                                    Consentimiento de imagen
+                                    {recibo.consentimiento.firmado ? ' (firmado)' : ' (pendiente)'}
+                                </a>
+                            ) : null}
                             <button onClick={() => window.print()} className="text-slate-600 underline">Imprimir</button>
                         </div>
                     </div>

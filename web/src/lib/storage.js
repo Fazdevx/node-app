@@ -55,6 +55,11 @@ function normalizar(db) {
         db.codigosPago = db.codigosPago ?? [];
         db.pagos = db.pagos ?? [];
         db.cierres = db.cierres ?? [];
+        for (const m of db.matriculas) {
+            m.consentimientoFirmado = Boolean(m.consentimientoFirmado);
+            m.consentimientoFirmadoAt = m.consentimientoFirmadoAt ?? null;
+            m.consentimientoPromotor = m.consentimientoPromotor ?? null;
+        }
         recomputarSeq(db);
         return db;
     }

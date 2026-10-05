@@ -60,6 +60,9 @@ model Matricula {
   valorTotalCentimos Int
   observaciones      String?
   matriculadaAt      DateTime?
+  consentimientoFirmado   Boolean   @default(false)
+  consentimientoFirmadoAt DateTime?
+  consentimientoPromotor  String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

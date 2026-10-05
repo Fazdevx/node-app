@@ -7,8 +7,9 @@ import { fmtFecha, fmtFechaHora, fmtFechaHoraSeg, fmtCorta, rangoDia } from './l
 import { leer, reinit } from './lib/storage.js';
 import * as negocio from './lib/negocio.js';
 import { qrSvg } from './lib/qr.js';
-import { generarReciboPdfDataUrl } from './lib/pdf.js';
+import { generarReciboPdfDataUrl, generarConsentimientoPdfDataUrl } from './lib/pdf.js';
 import { enlaceWhatsapp, nombreArchivo } from './lib/recibos.js';
+import { nombreArchivoConsentimiento } from './lib/consentimientos.js';
 
 const listaTipos = TIPOS_DOCUMENTO.map((t) => t.valor).join(',');
 const listaMetodos = METODOS.map((m) => m.valor).join(',');
@@ -285,12 +286,73 @@ function rutaListado(tipo, { query }) {
 async function rutaRecibo(pagoId) {
     const pago = negocio.reciboDePago(pagoId);
     const pdfUrl = await generarReciboPdfDataUrl(pago, pago.matricula);
+    const m = pago.matricula;
 
     return {
         recibo: {
-            ...validarReciboPago(pago, pago.matricula),
+            ...validarReciboPago(pago, m),
             pdf_url: pdfUrl,
             whatsapp_url: `/api/caja/recibo/${pago.id}/whatsapp`,
+            consentimiento: {
+                matricula_id: m.id,
+                ...negocio.firmaConsentimiento(m),
+                pdf_url: await generarConsentimientoPdfDataUrl(m, {
+                    promotor: m.consentimientoPromotor,
+                    fecha: m.consentimientoFirmadoAt ?? new Date(),
+                }),
+                nombre_archivo: nombreArchivoConsentimiento(m.id),
+            },
+        },
+    };
+}
+
+async function rutaConsentimiento(matriculaId, { body } = {}) {
+    const id = Number(matriculaId);
+    const matricula = negocio.matriculaPorId(id);
+
+    if (!body) {
+        return {
+            consentimiento: {
+                matricula_id: matricula.id,
+                ...negocio.firmaConsentimiento(matricula),
+                pdf_url: await generarConsentimientoPdfDataUrl(matricula, {
+                    promotor: matricula.consentimientoPromotor,
+                    fecha: matricula.consentimientoFirmadoAt ?? new Date(),
+                }),
+                nombre_archivo: nombreArchivoConsentimiento(matricula.id),
+            },
+        };
+    }
+
+    try {
+        validar(body, {
+            firmado: ['required', 'boolean'],
+            promotor: ['nullable', 'string', 'max:120'],
+        });
+    } catch (err) {
+        if (err instanceof ErrorValidacion) {
+            throw errorCliente({ errors: err.campos });
+        }
+        throw err;
+    }
+
+    const resultado = negocio.registrarConsentimiento(id, {
+        firmado: [true, 1, '1', 'true', 'on'].includes(body.firmado),
+        promotor: body.promotor ?? null,
+    });
+
+    const actualizada = negocio.matriculaPorId(id);
+
+    return {
+        exito: resultado.exito,
+        consentimiento: {
+            matricula_id: actualizada.id,
+            ...negocio.firmaConsentimiento(actualizada),
+            pdf_url: await generarConsentimientoPdfDataUrl(actualizada, {
+                promotor: actualizada.consentimientoPromotor,
+                fecha: actualizada.consentimientoFirmadoAt ?? new Date(),
+            }),
+            nombre_archivo: nombreArchivoConsentimiento(actualizada.id),
         },
     };
 }
@@ -500,6 +562,8 @@ const rutas = [
     { metodo: 'GET', patron: /^\/api\/caja\/matriculas\/pendientes$/, fn: (estado) => rutaListado('pendientes', estado) },
     { metodo: 'GET', patron: /^\/api\/caja\/matriculas\/completadas$/, fn: (estado) => rutaListado('completadas', estado) },
     { metodo: 'GET', patron: /^\/api\/caja\/recibo\/([^/]+)$/, fn: (_estado, co) => rutaRecibo(Number(decodeURIComponent(co[1]))) },
+    { metodo: 'GET', patron: /^\/api\/caja\/matriculas\/(\d+)\/consentimiento$/, fn: (estado, co) => rutaConsentimiento(Number(co[1]), estado) },
+    { metodo: 'POST', patron: /^\/api\/caja\/matriculas\/(\d+)\/consentimiento$/, fn: (estado, co) => rutaConsentimiento(Number(co[1]), estado) },
     { metodo: 'POST', patron: /^\/api\/caja\/recibo\/([^/]+)\/whatsapp$/, fn: (estado, co) => rutaWhatsapp(Number(decodeURIComponent(co[1])), estado) },
     { metodo: 'GET', patron: /^\/api\/cierres\/preparar$/, fn: (estado) => rutaCierresPreparar(estado) },
     { metodo: 'GET', patron: /^\/api\/cierres\/lista$/, fn: (estado) => rutaCierresLista(estado) },

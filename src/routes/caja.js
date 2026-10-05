@@ -6,8 +6,9 @@ import { AppError, ErrorValidacion, CodigoPagoError } from '../lib/errores.js';
 import { GeneradorCodigo } from '../lib/codigo.js';
 import { registrarPago } from '../services/registrarPago.js';
 import { matricularEnCaja } from '../services/matricularEnCaja.js';
-import { generarPdfRecibo } from '../lib/pdf.js';
+import { generarPdfRecibo, generarPdfConsentimiento } from '../lib/pdf.js';
 import { nombreArchivo, enlaceWhatsapp } from '../lib/recibos.js';
+import { nombreArchivoConsentimiento } from '../lib/consentimientos.js';
 import { config } from '../config.js';
 import { urlFirmada, middlewareUrlFirmada } from '../lib/firma.js';
 import { paginar } from '../lib/paginador.js';
@@ -252,16 +253,111 @@ router.get('/matriculas/completadas', as(async (req, res) => {
             estado: m.estado,
             estado_etiqueta: estadoMatriculaEtiqueta(m.estado),
             ultimo_pago_id: ultimoPago?.id ?? null,
+            consentimiento: firmaConsentimiento(m),
         };
     });
 
     res.json({ matriculas: { ...paginar(page, total, perPagina, uri), data: datos } });
 }));
 
+router.get('/matriculas/:matricula/consentimiento', as(async (req, res) => {
+    const matricula = await cargarMatricula(req.params.matricula);
+
+    res.json({
+        consentimiento: {
+            matricula_id: matricula.id,
+            ...firmaConsentimiento(matricula),
+            pdf_url: urlFirmada('caja.consentimiento.pdf', matricula.id, 3600, `/api/caja/matriculas/${matricula.id}/consentimiento/pdf`),
+            nombre_archivo: nombreArchivoConsentimiento(matricula.id),
+        },
+    });
+}));
+
+router.post('/matriculas/:matricula/consentimiento', as(async (req, res) => {
+    const datos = req.body ?? {};
+
+    try {
+        validar(datos, {
+            firmado: ['required', 'boolean'],
+            promotor: ['nullable', 'string', 'max:120'],
+        });
+    } catch (err) {
+        if (err instanceof ErrorValidacion) {
+            return res.status(422).json({ errors: err.campos });
+        }
+        throw err;
+    }
+
+    await cargarMatricula(req.params.matricula);
+
+    const firmado = aBooleano(datos.firmado);
+    const promotor = firmado
+        ? String(datos.promotor ?? '').trim() || null
+        : null;
+
+    const matricula = await prisma.matricula.update({
+        where: { id: Number(req.params.matricula) },
+        data: {
+            consentimientoFirmado: firmado,
+            consentimientoFirmadoAt: firmado ? new Date() : null,
+            consentimientoPromotor: promotor,
+        },
+        include: INCLUYE_MATRICULA,
+    });
+
+    return res.json({
+        exito: firmado
+            ? 'Consentimiento marcado como firmado.'
+            : 'Consentimiento marcado como pendiente.',
+        consentimiento: {
+            matricula_id: matricula.id,
+            ...firmaConsentimiento(matricula),
+            pdf_url: urlFirmada('caja.consentimiento.pdf', matricula.id, 3600, `/api/caja/matriculas/${matricula.id}/consentimiento/pdf`),
+            nombre_archivo: nombreArchivoConsentimiento(matricula.id),
+        },
+    });
+}));
+
+router.get('/matriculas/:matricula/consentimiento/pdf', middlewareUrlFirmada('caja.consentimiento.pdf'), as(async (req, res) => {
+    const matricula = await cargarMatricula(req.params.matricula);
+    const buffer = await generarPdfConsentimiento(matricula, {
+        promotor: matricula.consentimientoPromotor,
+        fecha: matricula.consentimientoFirmadoAt ?? new Date(),
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${nombreArchivoConsentimiento(matricula.id)}"`);
+    res.setHeader('Cache-Control', 'no-store, private');
+    res.send(Buffer.from(buffer));
+}));
+
 const INCLUYE_RECIBO = {
     matricula: { include: { aspirante: true, programa: true } },
     codigoPago: true,
 };
+
+const INCLUYE_MATRICULA = { aspirante: true, programa: true };
+
+const aBooleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
+
+function firmaConsentimiento(matricula) {
+    return {
+        firmado: Boolean(matricula.consentimientoFirmado),
+        firmado_at: matricula.consentimientoFirmadoAt ? fmtFecha(matricula.consentimientoFirmadoAt) : null,
+        promotor: matricula.consentimientoPromotor ?? null,
+    };
+}
+
+async function cargarMatricula(id) {
+    const matricula = await prisma.matricula.findUnique({
+        where: { id: Number(id) },
+        include: INCLUYE_MATRICULA,
+    });
+    if (!matricula) {
+        throw new AppError('La matrícula no existe.', 'matricula_no_encontrada', 404);
+    }
+    return matricula;
+}
 
 async function cargarPago(id) {
     const pago = await prisma.pago.findUnique({ where: { id: Number(id) }, include: INCLUYE_RECIBO });
@@ -303,8 +399,14 @@ router.get('/recibo/:pago', as(async (req, res) => {
                 vuelto: pago.vueltoCentimos / 100,
                 registrado_por: null,
             },
-            pdf_url: urlFirmada('caja.recibo.pdf', pago.id, 3600),
+            pdf_url: urlFirmada('caja.recibo.pdf', pago.id, 3600, `/api/caja/recibo/${pago.id}/pdf`),
             whatsapp_url: urlFirmada('caja.recibo.whatsapp', pago.id, 3600, `/api/caja/recibo/${pago.id}/whatsapp`),
+            consentimiento: {
+                matricula_id: m.id,
+                ...firmaConsentimiento(m),
+                pdf_url: urlFirmada('caja.consentimiento.pdf', m.id, 3600, `/api/caja/matriculas/${m.id}/consentimiento/pdf`),
+                nombre_archivo: nombreArchivoConsentimiento(m.id),
+            },
         },
     });
 }));
@@ -342,7 +444,7 @@ router.post('/recibo/:pago/whatsapp', middlewareUrlFirmada('caja.recibo.whatsapp
 
     res.json({
         whatsapp_url: whatsappUrl,
-        pdf_url: urlFirmada('caja.recibo.pdf', pago.id, 900),
+        pdf_url: urlFirmada('caja.recibo.pdf', pago.id, 900, `/api/caja/recibo/${pago.id}/pdf`),
         nombre_archivo: nombreArchivo(pago.id),
     });
 }));

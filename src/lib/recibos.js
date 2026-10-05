@@ -1,21 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { AppError } from './errores.js';
+import { imagenLogo } from './logo.js';
 import { estadoMatriculaEtiqueta, nombreCompleto, documento, METODO_POR_VALOR } from '../enums.js';
 import { config } from '../config.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const RUTA_LOGO = path.join(__dirname, '../../web/public/logo-galileo-monocromo.png');
-let logoBase64 = null;
-
-function logo() {
-    if (logoBase64 === null) {
-        logoBase64 = readFileSync(RUTA_LOGO).toString('base64');
-    }
-    return logoBase64;
-}
 
 export const nombreArchivo = (pagoId) => `recibo-${String(pagoId).padStart(6, '0')}.pdf`;
 
@@ -100,7 +86,7 @@ export function construirReciboPdf(pago, matricula) {
         content: [
             {
                 stack: [
-                    { image: `data:image/png;base64,${logo()}`, width: 195, alignment: 'center' },
+                    { image: imagenLogo(), width: 195, alignment: 'center' },
                     { text: 'Recibo de pago', style: 'h1', alignment: 'center' },
                     { text: 'Confirmación de matrícula · Academia Galileo', style: 'subtitulo', alignment: 'center' },
                 ],

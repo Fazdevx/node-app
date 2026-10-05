@@ -203,6 +203,9 @@ export function iniciarMatricula(datosAspirante, { descuento = 0, horasVigencia 
             valorTotalCentimos: aCentavos(valorTotal),
             observaciones: observaciones ?? null,
             matriculadaAt: null,
+            consentimientoFirmado: false,
+            consentimientoFirmadoAt: null,
+            consentimientoPromotor: null,
             createdAt: ahoraIso(),
             updatedAt: ahoraIso(),
         };
@@ -465,10 +468,55 @@ export function listarMatriculas(estados, page = 1, perPagina = 20) {
             total_pagado: ultimoPago ? ultimoPago.valorTotalCentimos / 100 : m.valorTotalCentimos / 100,
             pagado_at: ultimoPago ? fmtFechaHoraSeg(new Date(ultimoPago.pagadoAt)) : null,
             ultimo_pago_id: ultimoPago?.id ?? null,
+            consentimiento: firmaConsentimiento(m),
         };
     });
 
     return { total, filas };
+}
+
+export function firmaConsentimiento(matricula) {
+    return {
+        firmado: Boolean(matricula.consentimientoFirmado),
+        firmado_at: matricula.consentimientoFirmadoAt
+            ? fmtFechaHoraSeg(new Date(matricula.consentimientoFirmadoAt))
+            : null,
+        promotor: matricula.consentimientoPromotor ?? null,
+    };
+}
+
+export function matriculaPorId(id) {
+    const db = leer();
+    const matricula = buscar(db, 'matriculas', id);
+    if (!matricula) {
+        throw new AppError('La matrícula no existe.', 'matricula_no_encontrada', 404);
+    }
+    return matriculaConRelaciones(db, matricula);
+}
+
+export function registrarConsentimiento(id, { firmado, promotor = null }) {
+    return mutar((db) => {
+        const matricula = buscar(db, 'matriculas', id);
+        if (!matricula) {
+            throw new AppError('La matrícula no existe.', 'matricula_no_encontrada', 404);
+        }
+
+        const activo = Boolean(firmado);
+        matricula.consentimientoFirmado = activo;
+        matricula.consentimientoFirmadoAt = activo ? ahoraIso() : null;
+        matricula.consentimientoPromotor = activo ? (String(promotor ?? '').trim() || null) : null;
+        matricula.updatedAt = ahoraIso();
+
+        return {
+            exito: activo
+                ? 'Consentimiento marcado como firmado.'
+                : 'Consentimiento marcado como pendiente.',
+            consentimiento: {
+                matricula_id: matricula.id,
+                ...firmaConsentimiento(matricula),
+            },
+        };
+    });
 }
 
 export function reciboDePago(pagoId) {

@@ -1,27 +1,7 @@
 import { AppError } from './errores.js';
+import { logoDataUrl } from './logo.js';
 import { estadoMatriculaEtiqueta, nombreCompleto, documento, METODO_POR_VALOR } from './enums.js';
 import { config } from './config.js';
-
-let logoDataUrlCache = null;
-
-export async function logoDataUrl() {
-    if (logoDataUrlCache) {
-        return logoDataUrlCache;
-    }
-    try {
-        const respuesta = await fetch('/logo-galileo-monocromo.png');
-        const blob = await respuesta.blob();
-        logoDataUrlCache = await new Promise((resolve, reject) => {
-            const lector = new FileReader();
-            lector.onload = () => resolve(lector.result);
-            lector.onerror = () => reject(new Error('No se pudo cargar el logo.'));
-            lector.readAsDataURL(blob);
-        });
-    } catch {
-        logoDataUrlCache = '';
-    }
-    return logoDataUrlCache;
-}
 
 export const nombreArchivo = (pagoId) => `recibo-${String(pagoId).padStart(6, '0')}.pdf`;
 
